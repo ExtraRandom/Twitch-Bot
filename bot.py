@@ -1,43 +1,33 @@
-# bot.py
-# The code for our bot
-
 import cfg
-import utils
-import sql
+import utils  # import sql
 import socket
 import re
-import time, thread
+import time, _thread as thread
 from time import sleep
+from datetime import datetime
+
+import commands
+
+import asyncio
+
 
 class Command(object):
     cmd = ""
     response = ""
     description = ""
     op = 0
+
     def __init__(self, cmd, response, description, op):
         self.cmd = cmd
         self.response = response
         self.description = description
         self.op = op
 
-def parse(c, s):
-    if c.response.find("~") > -1:
-        list = c.response.split("~")
-        for item in list:
-            if item.find("{") > -1:
-                code = item.split("{")[1].split("}")[0]
-                utils.chat(s, item.split("{")[0] + eval(code))
-            else:
-                utils.chat(s, item)
-    else:
 
-        if c.response.find("{") > -1:
-            code = c.response.split("{")[1].split("}")[0]
-            utils.chat(s, c.response.split("{")[0] + eval(code))
-        else:
-            utils.chat(s, c.response)
+async def main():
 
-def main():
+    print("Bot Started at: {} UTC".format(datetime.utcnow()))
+
     # Networking functions
     s = socket.socket()
     s.connect((cfg.HOST, cfg.PORT))
@@ -46,33 +36,48 @@ def main():
     s.send("JOIN #{}\r\n".format(cfg.CHAN).encode("utf-8"))
 
     CHAT_MSG = re.compile(r"^:\w+!\w+@\w+\.tmi\.twitch\.tv PRIVMSG #\w+ :")
-    utils.chat(s, "Hi everyone!")
+    utils.chat(s, "Bot Online")
 
     thread.start_new_thread(utils.threadFillOpList, ())
 
-    commands = sql.getCommands()
-
-    cmd = []
-    for c in commands:
-        cmd.append(Command(c["Command"], c["Response"], c["Description"], c["Op"]))
-
     while True:
         response = s.recv(1024).decode("utf-8")
+        # print(response)
+
         if response == "PING :tmi.twitch.tv\r\n":
-            s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))
+            s.send("PONG :tmi.twitch.tv\r\n".encode("utf-8"))  # print("Pong!")
         else:
             username = re.search(r"\w+", response).group(0)
             message = CHAT_MSG.sub("", response)
-            print(response)
 
-            for c in cmd:
-                if message.strip() == c.cmd:
-                    if c.op == 0:
-                        parse(c, s)
-                    else:
-                        if utils.isOp(username):
-                            parse(c, s)
+            # print(message)
+            cmd = message.strip().split(" ")
+
+            if cmd[0] != ":tmi.twitch.tv" and cmd[0] != ":{0}!{0}@{0}.tmi.twitch.tv".format(cfg.CHAN):
+                print("cmd: {}".format(cmd[0]))
+                if len(cmd) > 1:
+                    print("args: {}".format(cmd[1:]))
+
+            if cmd[0] == "!test":
+                utils.chat(s, "Hello there, {}".format(username))
+                print("ye1")
+
+            if cmd[0] in cfg.TUBE_ALIAS:  # cmd[0] == "!yt" or cmd[0] == "!youtube":
+                if cfg.TUBE_ACTIVE:
+                    utils.chat(s, commands.youtube())
+
+            if cmd[0] in cfg.TWIT_ALIAS:
+                if cfg.TWIT_ACTIVE:
+                    utils.chat(s, commands.twitter())
+
+            if cmd[0] in cfg.OW_ALIAS:
+                if cfg.OW_ACTIVE:
+                    utils.chat(s, await commands.ow())
+
         sleep(1)
-    utils.chat(s, "Bye everyone :)");
+
+    # utils.chat(s, "Bot Shutting Down");
 if __name__ == "__main__":
-    main()
+    # main()
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(main())

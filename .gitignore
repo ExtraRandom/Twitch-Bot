@@ -1,0 +1,5 @@
+.idea/Creating-a-Twitch-Bot.iml
+*.xml
+__pycache__/utils.cpython-35.pyc
+*.pyc
+cfg.py
