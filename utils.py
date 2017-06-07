@@ -2,10 +2,8 @@
 # A bunch of utility functions
 
 import cfg
-# import urllib2
 import json
-# from urllib.request import urlopen
-import urllib.request
+import requests
 
 import time, _thread as thread
 from time import sleep
@@ -18,8 +16,9 @@ from time import sleep
 
 
 def chat(sock, msg):
-    # thing = "PRIVMSG #{} :{}\r\n".format(cfg.CHAN, msg)
-    sock.send(("PRIVMSG #{} :{}\r\n".format(cfg.CHAN, msg)).encode('utf-8'))  # thing.encode('utf-8'))
+    channel = cfg.CHAN.replace("#", "")  # A weird fix that I'm not happy with but it makes the bot work again so It'll
+    # do for no, TODO fix this if it ever breaks something
+    sock.send(("PRIVMSG #{} :{}\r\n".format(channel, msg)).encode('utf-8'))
 
 # Function: ban
 # Ban a user from the channel
@@ -47,14 +46,18 @@ def timeout(sock, user, seconds=600):
 
 
 def threadFillOpList():
+    # TODO make sure this isn't broken
+
     while True:
         try:
-            url = "http://tmi.twitch.tv/group/user/limeoats/chatters"
-            req = urllib.request.Request(url, headers={"accept": "*/*"})
-            response = urllib.request.urlopen(req).read()
-            if response.find("502 Bad Gateway") == -1:
+            url = "http://tmi.twitch.tv/group/user/{}/chatters".format(cfg.CHAN)
+            resp = requests.get(url)
+
+            if resp.status_code == requests.codes.ok:
                 cfg.oplist.clear()
-                data = json.loads(response)
+                data = json.loads(resp.text)
+                # print("chatters {}".format(data["chatter_count"]))
+
                 for p in data["chatters"]["moderators"]:
                     cfg.oplist[p] = "mod"
                 for p in data["chatters"]["global_mods"]:
@@ -63,9 +66,11 @@ def threadFillOpList():
                     cfg.oplist[p] = "admin"
                 for p in data["chatters"]["staff"]:
                     cfg.oplist[p] = "staff"
-        except:
-            'do nothing'
-        sleep(5)
+
+        except Exception as e:
+            print("Failed to update Op List: {}".format(e))
+        # print("Updated Op List")
+        sleep(60)
 
 
 def isOp(user):
